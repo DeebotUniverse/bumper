@@ -50,12 +50,15 @@ async def start_configuration() -> None:
     if bumper_isc.BUMPER_PROXY_WEB is True:
         _LOGGER.info("Proxy Web Enabled")
 
-    bumper_isc.mqtt_server = server_mqtt.MQTTServer(
-        [
-            server_mqtt.MQTTBinding(bumper_isc.bumper_listen, bumper_isc.MQTT_LISTEN_PORT_TLS, True),
-            server_mqtt.MQTTBinding(bumper_isc.bumper_listen, bumper_isc.MQTT_LISTEN_PORT, False),
-        ],
-    )
+    _mqtt_bindings = [
+        server_mqtt.MQTTBinding(bumper_isc.bumper_listen, bumper_isc.MQTT_LISTEN_PORT_TLS, True),
+        server_mqtt.MQTTBinding(bumper_isc.bumper_listen, bumper_isc.MQTT_LISTEN_PORT, False),
+    ]
+    if bumper_isc.MQTT_LISTEN_PORT_NGIOT is not None:
+        _mqtt_bindings.append(
+            server_mqtt.MQTTBinding(bumper_isc.bumper_listen, bumper_isc.MQTT_LISTEN_PORT_NGIOT, True)
+        )
+    bumper_isc.mqtt_server = server_mqtt.MQTTServer(_mqtt_bindings)
     # bumper_isc.mqtt_helperbot = helper_bot.MQTTHelperBot(bumper_isc.bumper_listen, bumper_isc.MQTT_LISTEN_PORT_TLS, True)
     bumper_isc.mqtt_helperbot = helper_bot.MQTTHelperBot(bumper_isc.bumper_listen, bumper_isc.MQTT_LISTEN_PORT, False)
     bumper_isc.web_server = server_web.WebServer(

@@ -4,8 +4,12 @@ import asyncio
 import base64
 import dataclasses
 from dataclasses import dataclass, field
+import json
 import logging
 from pathlib import Path
+import random
+import string
+import time
 from typing import Literal
 
 from amqtt.broker import Broker
@@ -368,6 +372,54 @@ class BumperMQTTServerPlugin(BaseAuthPlugin):  # type: ignore[misc]
     async def on_broker_client_connected(self, client_id: str, client_session: Session) -> None:
         """On client connected."""
         self._set_client_connected(client_id, True, client_session)
+        # Send post-connect handshake for bot devices (SetTime + config)
+        asyncio.create_task(self._send_bot_handshake(client_id))
+
+    async def _send_bot_handshake(self, client_id: str) -> None:
+        """Send SetTime and config push to a newly connected bot."""
+        try:
+            if client_id == helper_bot.HELPER_BOT_CLIENT_ID:
+                return
+
+            if (result := self._client_id_split_helper(client_id)) is None:
+                return
+            did, class_id, resource, client_type = result
+
+            if client_type != "bot":
+                return
+
+            helperbot = bumper_isc.mqtt_helperbot
+            if helperbot is None or not await helperbot.is_connected:
+                _LOGGER.warning(f"Handshake skipped :: HelperBot not connected :: {client_id}")
+                return
+
+            # Small delay to let the bot finish subscribing to topics
+            await asyncio.sleep(1)
+
+            requester_id = "HelperMQClientId-sts-ngiot-mqserver-eco1-1"
+            request_id = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+
+            # 1. Send SetTime
+            now_ms = int(time.time() * 1000)
+            now_sec = int(time.time())
+            set_time_topic = (
+                f"iot/p2p/SetTime/{requester_id}/ecosys/1234/"
+                f"{did}/{class_id}/{resource}/q/{request_id}/j"
+            )
+            set_time_payload = json.dumps({"ts": now_ms, "tsInSec": now_sec})
+            await helperbot.publish(set_time_topic, set_time_payload)
+            _LOGGER.info(f"Handshake :: SetTime sent to {client_id}")
+
+            # 2. Push setting2 config
+            setting2_topic = f"iot/cfg/{did}/{class_id}/{resource}/j/setting2"
+            setting2_payload = json.dumps({
+                "setting2": {"cfg": {"improve": {"version": "11.16", "isAccept": False}}}
+            })
+            await helperbot.publish(setting2_topic, setting2_payload)
+            _LOGGER.info(f"Handshake :: setting2 config pushed to {client_id}")
+
+        except Exception:
+            _LOGGER.exception(f"Handshake failed for {client_id}")
 
     async def on_broker_client_disconnected(self, client_id: str, client_session: Session) -> None:
         """On client disconnect."""
