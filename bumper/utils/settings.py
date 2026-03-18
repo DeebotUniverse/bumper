@@ -92,10 +92,11 @@ class Config:
     DOMAIN_SEC6 = DOMAIN_SEC  # f"bumper.{DOMAIN_SEC}"
 
     # Ports
-    WEB_SERVER_TLS_LISTEN_PORT: int = int(os.environ.get("WEB_SERVER_HTTPS_PORT") or 443)
+    WEB_SERVER_TLS_LISTEN_PORT: int = int(os.environ.get("WEB_SERVER_HTTPS_PORT") or (8443 if os.environ.get("MQTT_LISTEN_PORT_NGIOT") == "443" else 443))
     WEB_SERVER_LISTEN_PORT: int = int(os.environ.get("WEB_SERVER_LISTEN_PORT") or 8007)
     MQTT_LISTEN_PORT: int = int(os.environ.get("MQTT_LISTEN_PORT") or 1883)
     MQTT_LISTEN_PORT_TLS: int = int(os.environ.get("MQTT_LISTEN_PORT_TLS") or 8883)
+    MQTT_LISTEN_PORT_NGIOT: int | None = int(os.environ["MQTT_LISTEN_PORT_NGIOT"]) if os.environ.get("MQTT_LISTEN_PORT_NGIOT") else None
     XMPP_LISTEN_PORT: int = int(os.environ.get("XMPP_LISTEN_PORT") or 1223)
     XMPP_LISTEN_PORT_TLS: int = int(os.environ.get("XMPP_LISTEN_PORT_TLS") or 5223)
 
